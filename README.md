@@ -2,7 +2,9 @@
 
 A custom [Home Assistant](https://www.home-assistant.io/) Lovelace card that displays real-time energy flow between Solar, Home, Battery, Grid and EV nodes — with animated bezier flow lines, pulse animations, battery gauges, and automatic weather/time-based background image switching.
 
-![Energy Flow Card](screenshot.png)
+![Day](day-screen.png)
+![Night](night-screen.png)
+![Rainy Day](day-rain-screen.png)
 
 ---
 
