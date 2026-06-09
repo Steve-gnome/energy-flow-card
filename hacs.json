@@ -1,0 +1,7 @@
+{
+  "name": "Energy Flow Card",
+  "description": "Animated energy flow visualiser for Solar, Battery, Grid and EV",
+  "render_readme": true,
+  "filename": "energy-flow-card.js",
+  "homeassistant": "2023.1.0"
+}
