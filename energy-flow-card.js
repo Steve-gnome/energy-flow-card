@@ -32,6 +32,22 @@
  * # Node pulse animation (true/false)
  * node_animation: true
  *
+ * # Node labels (override default text on each node)
+ * node_labels:
+ *   solar:     Solar
+ *   home:      Home
+ *   powerwall: Battery
+ *   grid:      Grid
+ *   ev:        EV
+ *
+ * # Node positions as % of card width/height
+ * nodes:
+ *   solar:     { left: 48, top: 20 }
+ *   home:      { left: 55, top: 50 }
+ *   powerwall: { left: 15, top: 60 }
+ *   grid:      { left: 15, top: 25 }
+ *   ev:        { left: 80, top: 65 }
+ *
  * # Entity IDs
  * entities:
  *   solar:         sensor.solar_power
@@ -41,14 +57,6 @@
  *   grid:          sensor.grid_power         # negative = export, positive = import
  *   ev_power:      sensor.ev_charging_power
  *   ev_pct:        sensor.ev_battery_level
- *
- * # Node positions as % of card width/height
- * nodes:
- *   solar:     { left: 48, top: 20 }
- *   home:      { left: 55, top: 50 }
- *   powerwall: { left: 15, top: 60 }
- *   grid:      { left: 15, top: 25 }
- *   ev:        { left: 80, top: 65 }
  */
 
 // ── Flow thresholds (kW) ─────────────────────────────────
@@ -57,6 +65,15 @@ const THRESHOLD_HOME     = 0.05;
 const THRESHOLD_BATTERY  = 0.03;
 const THRESHOLD_GRID     = 0.40;
 const THRESHOLD_EV       = 0.05;
+
+// ── Default node labels ──────────────────────────────────
+const DEFAULT_LABELS = {
+  solar:     'Solar',
+  home:      'Home',
+  powerwall: 'Battery',
+  grid:      'Grid',
+  ev:        'EV',
+};
 
 // ── Default node positions ───────────────────────────────
 const DEFAULT_NODES = {
@@ -442,10 +459,11 @@ class EnergyFlowCard extends HTMLElement {
 
   static getStubConfig() {
     return {
-      background:    '/local/day.jpg',
-      entities:      DEFAULT_ENTITIES,
-      nodes:         DEFAULT_NODES,
-      node_opacity:  0.4,
+      background:     '/local/day.jpg',
+      entities:       DEFAULT_ENTITIES,
+      nodes:          DEFAULT_NODES,
+      node_labels:    DEFAULT_LABELS,
+      node_opacity:   0.4,
       node_animation: true,
     };
   }
@@ -469,6 +487,16 @@ class EnergyFlowCard extends HTMLElement {
     const animate = this._config.node_animation !== undefined ? this._config.node_animation : true;
     this.shadowRoot.querySelectorAll('.pulse-ring')
       .forEach(r => r.style.animationName = animate ? '' : 'none');
+
+    this._applyLabels();
+  }
+
+  _applyLabels() {
+    const labels = Object.assign({}, DEFAULT_LABELS, this._config.node_labels || {});
+    for (const [key, label] of Object.entries(labels)) {
+      const el = this.shadowRoot.querySelector(`#node-${key} .node-label`);
+      if (el) el.textContent = label;
+    }
   }
 
   _updateBackground() {
@@ -547,7 +575,8 @@ class EnergyFlowCard extends HTMLElement {
     sr.getElementById('val-solar').innerHTML      = fmtKw(solar);
     sr.getElementById('val-home').innerHTML       = fmtKw(home);
     sr.getElementById('val-battery').innerHTML    = fmtKw(powerwall);
-    sr.getElementById('val-batt-pct').textContent = powerwallPct.toFixed(1) + '%';
+    const battPctEl = sr.getElementById('val-batt-pct');
+    if (battPctEl) battPctEl.textContent = Number(powerwallPct).toFixed(1) + '%';
     sr.getElementById('val-grid').innerHTML       = fmtKw(grid);
     sr.getElementById('val-grid-dir').textContent = gridImport ? 'importing' : gridExport ? 'exporting' : 'idle';
     sr.getElementById('val-ev').innerHTML         = fmtKw(evPower);
