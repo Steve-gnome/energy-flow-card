@@ -407,6 +407,7 @@ const TEMPLATE = `
     <span class="flow-tag solar" id="tag-solar-grid">Solar → Grid</span>
     <span class="flow-tag batt"  id="tag-batt-home">Battery → Home</span>
     <span class="flow-tag grid"  id="tag-grid-home">Grid → Home</span>
+    <span class="flow-tag grid"  id="tag-grid-batt">Grid → Battery</span>
     <span class="flow-tag ev"    id="tag-solar-ev">Solar → EV</span>
     <span class="flow-tag ev"    id="tag-batt-ev">Battery → EV</span>
     <span class="flow-tag ev"    id="tag-grid-ev">Grid → EV</span>
@@ -428,7 +429,7 @@ class EnergyFlowCard extends HTMLElement {
       grid: 0, evPower: 0, evBattPct: 0,
       flows: {
         solarHome: false, solarBatt: false, solarGrid: false,
-        battHome:  false, gridHome:  false,
+        battHome:  false, gridHome:  false, gridBatt: false,
         solarEv:   false, battEv:    false, gridEv: false,
       },
     };
@@ -560,10 +561,11 @@ class EnergyFlowCard extends HTMLElement {
 
     s.flows = {
       solarHome: solarActive  && home > THRESHOLD_HOME,
-      solarBatt: solarActive  && battCharging,
+      solarBatt: solarActive  && battCharging && !gridImport,
       solarGrid: solarActive  && gridExport,
       battHome:  battDischarge,
-      gridHome:  gridImport,
+      gridHome:  gridImport   && !battCharging,
+      gridBatt:  gridImport   && battCharging,
       solarEv:   evCharging   && solarActive && !gridImport,
       battEv:    evCharging   && battDischarge,
       gridEv:    evCharging   && gridImport,
@@ -597,6 +599,7 @@ class EnergyFlowCard extends HTMLElement {
     this._setTag('tag-solar-grid', s.flows.solarGrid);
     this._setTag('tag-batt-home',  s.flows.battHome);
     this._setTag('tag-grid-home',  s.flows.gridHome);
+    this._setTag('tag-grid-batt',  s.flows.gridBatt);
     this._setTag('tag-solar-ev',   s.flows.solarEv);
     this._setTag('tag-batt-ev',    s.flows.battEv);
     this._setTag('tag-grid-ev',    s.flows.gridEv);
@@ -706,6 +709,7 @@ class EnergyFlowCard extends HTMLElement {
     this._drawFlow(ctx, 'solar',     'powerwall', 'solar',     'powerwall', f.solarBatt, s.solar);
     this._drawFlow(ctx, 'solar',     'grid',      'solar',     'grid',      f.solarGrid, s.solar);
     this._drawFlow(ctx, 'grid',      'home',      'grid',      'home',      f.gridHome,  Math.abs(s.grid));
+    this._drawFlow(ctx, 'grid',      'powerwall', 'grid',      'powerwall', f.gridBatt,  Math.abs(s.grid));
     this._drawFlow(ctx, 'powerwall', 'home',      'powerwall', 'home',      f.battHome,  Math.abs(s.powerwall));
     this._drawFlow(ctx, 'solar',     'home',      'solar',     'home',      f.solarHome, s.solar);
     this._drawFlow(ctx, 'solar',     'ev',        'solar',     'ev',        f.solarEv,   s.solar);
