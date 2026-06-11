@@ -57,6 +57,13 @@
  *   grid:          sensor.grid_power         # negative = export, positive = import
  *   ev_power:      sensor.ev_charging_power
  *   ev_pct:        sensor.ev_battery_level
+ *
+ * # Flow thresholds (kW) — minimum power to show a flow line
+ * threshold_solar:   0.05
+ * threshold_home:    0.05
+ * threshold_battery: 0.03
+ * threshold_grid:    0.40
+ * threshold_ev:      0.05
  */
 
 // ── Flow thresholds (kW) ─────────────────────────────────
@@ -133,7 +140,7 @@ const TEMPLATE = `
   #bg {
     position: absolute; inset: 0;
     width: 100%; height: 100%;
-    object-fit: contain;
+    object-fit: cover;
     object-position: center center;
     filter: brightness(0.85) saturate(1.1);
     z-index: 0;
@@ -540,6 +547,17 @@ class EnergyFlowCard extends HTMLElement {
     return s ? parseFloat(s.state) || 0 : 0;
   }
 
+  _thresholds() {
+    const c = this._config;
+    return {
+      solar:   c.threshold_solar   !== undefined ? c.threshold_solar   : THRESHOLD_SOLAR,
+      home:    c.threshold_home    !== undefined ? c.threshold_home    : THRESHOLD_HOME,
+      battery: c.threshold_battery !== undefined ? c.threshold_battery : THRESHOLD_BATTERY,
+      grid:    c.threshold_grid    !== undefined ? c.threshold_grid    : THRESHOLD_GRID,
+      ev:      c.threshold_ev      !== undefined ? c.threshold_ev      : THRESHOLD_EV,
+    };
+  }
+
   _updateFromHass() {
     if (!this._hass || !this._rendered) return;
 
@@ -556,15 +574,16 @@ class EnergyFlowCard extends HTMLElement {
     s.powerwallPct = powerwallPct; s.grid = grid;
     s.evPower = evPower; s.evBattPct = evBattPct;
 
-    const solarActive   = solar    >  THRESHOLD_SOLAR;
-    const battCharging  = powerwall < -THRESHOLD_BATTERY;
-    const battDischarge = powerwall >  THRESHOLD_BATTERY;
-    const gridImport    = grid     >  THRESHOLD_GRID;
-    const gridExport    = grid     < -THRESHOLD_GRID;
-    const evCharging    = evPower  >  THRESHOLD_EV;
+    const t = this._thresholds();
+    const solarActive   = solar    >  t.solar;
+    const battCharging  = powerwall < -t.battery;
+    const battDischarge = powerwall >  t.battery;
+    const gridImport    = grid     >  t.grid;
+    const gridExport    = grid     < -t.grid;
+    const evCharging    = evPower  >  t.ev;
 
     s.flows = {
-      solarHome: solarActive  && home > THRESHOLD_HOME,
+      solarHome: solarActive  && home > t.home,
       solarBatt: solarActive  && battCharging && !gridImport,
       solarGrid: solarActive  && gridExport,
       battHome:  battDischarge,
@@ -619,7 +638,7 @@ class EnergyFlowCard extends HTMLElement {
     sr.getElementById('gauge-ev-fill').style.height      = Math.min(Math.max(evBattPct,    0), 100) + '%';
 
     this._toggleActive('node-solar',     solarActive);
-    this._toggleActive('node-home',      home > THRESHOLD_HOME);
+    this._toggleActive('node-home',      home > t.home);
     this._toggleActive('node-powerwall', battCharging || battDischarge);
     this._toggleActive('node-grid',      gridImport || gridExport);
     this._toggleActive('node-ev',        evCharging);
@@ -857,19 +876,19 @@ class EnergyFlowCardEditor extends HTMLElement {
         <label>Day rain
           <input id="bg_day_rain" type="text" value="${c.background_day_rain || ''}" placeholder="/local/day-rain.jpg" />
         </label>
-        <label>Day heavy rain
-          <input id="bg_day_heavy" type="text" value="${c.background_day_heavy_rain || ''}" placeholder="/local/day-heavy-rain.jpg" />
-        </label>
         <label>Night rain
           <input id="bg_night_rain" type="text" value="${c.background_night_rain || ''}" placeholder="/local/night-rain.jpg" />
+        </label>
+        <label>Day heavy rain
+          <input id="bg_day_heavy" type="text" value="${c.background_day_heavy_rain || ''}" placeholder="/local/day-heavy-rain.jpg" />
         </label>
         <label>Night heavy rain
           <input id="bg_night_heavy" type="text" value="${c.background_night_heavy_rain || ''}" placeholder="/local/night-heavy-rain.jpg" />
         </label>
-        <label>Weather entity
-          <input id="weather_entity" type="text" value="${c.weather_entity || ''}" placeholder="weather.home" />
-        </label>
       </div>
+      <label>Weather entity
+        <input id="weather_entity" type="text" value="${c.weather_entity || ''}" placeholder="weather.home" />
+      </label>
 
       <h4>Appearance</h4>
       <label>Node opacity
@@ -892,6 +911,30 @@ class EnergyFlowCardEditor extends HTMLElement {
 
       <h4>Node positions (% of card width / height)</h4>
       <div class="grid">${posRows}</div>
+
+      <h4>Thresholds (kW)</h4>
+      <div class="grid">
+        <label>Solar
+          <input data-thr="solar" type="number" min="0" step="0.01"
+            value="${c.threshold_solar   !== undefined ? c.threshold_solar   : 0.05}" />
+        </label>
+        <label>Home
+          <input data-thr="home" type="number" min="0" step="0.01"
+            value="${c.threshold_home    !== undefined ? c.threshold_home    : 0.05}" />
+        </label>
+        <label>Battery
+          <input data-thr="battery" type="number" min="0" step="0.01"
+            value="${c.threshold_battery !== undefined ? c.threshold_battery : 0.03}" />
+        </label>
+        <label>Grid
+          <input data-thr="grid" type="number" min="0" step="0.01"
+            value="${c.threshold_grid    !== undefined ? c.threshold_grid    : 0.40}" />
+        </label>
+        <label>EV
+          <input data-thr="ev" type="number" min="0" step="0.01"
+            value="${c.threshold_ev      !== undefined ? c.threshold_ev      : 0.05}" />
+        </label>
+      </div>
     `;
 
     const fire = () => this._fire(this._buildConfig());
@@ -909,6 +952,7 @@ class EnergyFlowCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('[data-ent]').forEach(el => el.addEventListener('change', fire));
     this.shadowRoot.querySelectorAll('[data-lbl]').forEach(el => el.addEventListener('change', fire));
     this.shadowRoot.querySelectorAll('[data-pos]').forEach(el => el.addEventListener('change', fire));
+    this.shadowRoot.querySelectorAll('[data-thr]').forEach(el => el.addEventListener('change', fire));
   }
 
   _buildConfig() {
@@ -954,6 +998,15 @@ class EnergyFlowCardEditor extends HTMLElement {
       nodes[key][axis] = parseFloat(el.value);
     });
     if (Object.keys(nodes).length) cfg.nodes = nodes; else delete cfg.nodes;
+
+    const THR_DEFAULTS = { solar: 0.05, home: 0.05, battery: 0.03, grid: 0.40, ev: 0.05 };
+    this.shadowRoot.querySelectorAll('[data-thr]').forEach(el => {
+      const key = el.dataset.thr;
+      const val = parseFloat(el.value);
+      const cfgKey = 'threshold_' + key;
+      if (!isNaN(val) && val !== THR_DEFAULTS[key]) cfg[cfgKey] = val;
+      else delete cfg[cfgKey];
+    });
 
     return cfg;
   }
