@@ -458,6 +458,10 @@ class EnergyFlowCard extends HTMLElement {
   disconnectedCallback() { this._stopRender(); }
   getCardSize()          { return 6; }
 
+  static getConfigElement() {
+    return document.createElement('energy-flow-card-editor');
+  }
+
   static getStubConfig() {
     return {
       background:     '/local/day.jpg',
@@ -745,6 +749,222 @@ class EnergyFlowCard extends HTMLElement {
 }
 
 customElements.define('energy-flow-card', EnergyFlowCard);
+
+// ── Visual config editor ─────────────────────────────────────────────────────
+
+class EnergyFlowCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._config = {};
+  }
+
+  setConfig(config) {
+    this._config = config || {};
+    this._render();
+  }
+
+  _render() {
+    const c    = this._config;
+    const ent  = c.entities    || {};
+    const npos = c.nodes       || {};
+    const nlbl = c.node_labels || {};
+
+    const NODE_KEYS = ['solar','home','powerwall','grid','ev'];
+    const ENT_KEYS  = ['solar','home','powerwall','powerwall_pct','grid','ev_power','ev_pct'];
+    const ENT_LABELS = {
+      solar:         'Solar power',
+      home:          'Home load',
+      powerwall:     'Battery power',
+      powerwall_pct: 'Battery level (%)',
+      grid:          'Grid power',
+      ev_power:      'EV power',
+      ev_pct:        'EV battery level (%)',
+    };
+    const DEF_ENT = {
+      solar:         'sensor.solar_power',
+      home:          'sensor.home_load',
+      powerwall:     'sensor.battery_power',
+      powerwall_pct: 'sensor.battery_level',
+      grid:          'sensor.grid_power',
+      ev_power:      'sensor.ev_charging_power',
+      ev_pct:        'sensor.ev_battery_level',
+    };
+    const DEF_LBL = { solar:'Solar', home:'Home', powerwall:'Battery', grid:'Grid', ev:'EV' };
+    const DEF_POS = {
+      solar:     { left:48, top:20 }, home: { left:55, top:50 },
+      powerwall: { left:15, top:60 }, grid: { left:15, top:25 }, ev: { left:80, top:65 },
+    };
+
+    const entRows = ENT_KEYS.map(k => `
+      <label>${ENT_LABELS[k]}
+        <input data-ent="${k}" type="text" value="${ent[k] || ''}" placeholder="${DEF_ENT[k]}" />
+      </label>`).join('');
+
+    const lblRows = NODE_KEYS.map(k => `
+      <label>${DEF_LBL[k]}
+        <input data-lbl="${k}" type="text" value="${nlbl[k] || ''}" placeholder="${DEF_LBL[k]}" />
+      </label>`).join('');
+
+    const posRows = NODE_KEYS.map(k => `
+      <label>${DEF_LBL[k]} left (%)
+        <input data-pos="${k}" data-axis="left" type="number" min="0" max="100"
+          value="${npos[k] !== undefined ? npos[k].left : DEF_POS[k].left}" />
+      </label>
+      <label>${DEF_LBL[k]} top (%)
+        <input data-pos="${k}" data-axis="top" type="number" min="0" max="100"
+          value="${npos[k] !== undefined ? npos[k].top : DEF_POS[k].top}" />
+      </label>`).join('');
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display: block; font-family: var(--paper-font-body1_-_font-family, sans-serif); }
+        h4 {
+          margin: 16px 0 6px; font-size: 12px; font-weight: 600;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          color: var(--secondary-text-color);
+          border-bottom: 1px solid var(--divider-color); padding-bottom: 4px;
+        }
+        .grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+        .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 16px; }
+        label  { display: flex; flex-direction: column; font-size: 12px; color: var(--primary-text-color); gap: 4px; }
+        input[type=text], input[type=number] {
+          padding: 6px 8px; border-radius: 4px;
+          border: 1px solid var(--divider-color);
+          background: var(--card-background-color);
+          color: var(--primary-text-color);
+          font-size: 13px; width: 100%; box-sizing: border-box;
+        }
+        input:focus { outline: 2px solid var(--primary-color); border-color: transparent; }
+        input[type=range] { width: 100%; margin-top: 4px; }
+        .range-row { display: flex; align-items: center; gap: 8px; }
+        .range-val { font-size: 13px; min-width: 34px; color: var(--primary-text-color); }
+        .toggle-row {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 8px 0; font-size: 13px; color: var(--primary-text-color);
+        }
+        input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+      </style>
+
+      <h4>Background images</h4>
+      <div class="grid">
+        <label>Day
+          <input id="bg" type="text" value="${c.background || ''}" placeholder="/local/day.jpg" />
+        </label>
+        <label>Night
+          <input id="bg_night" type="text" value="${c.background_night || ''}" placeholder="/local/night.jpg" />
+        </label>
+        <label>Day rain
+          <input id="bg_day_rain" type="text" value="${c.background_day_rain || ''}" placeholder="/local/day-rain.jpg" />
+        </label>
+        <label>Day heavy rain
+          <input id="bg_day_heavy" type="text" value="${c.background_day_heavy_rain || ''}" placeholder="/local/day-heavy-rain.jpg" />
+        </label>
+        <label>Night rain
+          <input id="bg_night_rain" type="text" value="${c.background_night_rain || ''}" placeholder="/local/night-rain.jpg" />
+        </label>
+        <label>Night heavy rain
+          <input id="bg_night_heavy" type="text" value="${c.background_night_heavy_rain || ''}" placeholder="/local/night-heavy-rain.jpg" />
+        </label>
+        <label>Weather entity
+          <input id="weather_entity" type="text" value="${c.weather_entity || ''}" placeholder="weather.home" />
+        </label>
+      </div>
+
+      <h4>Appearance</h4>
+      <label>Node opacity
+        <div class="range-row">
+          <input id="node_opacity" type="range" min="0" max="1" step="0.05"
+            value="${c.node_opacity !== undefined ? c.node_opacity : 0.4}" />
+          <span class="range-val" id="opacity-val">${c.node_opacity !== undefined ? c.node_opacity : 0.4}</span>
+        </div>
+      </label>
+      <div class="toggle-row">
+        <span>Node pulse animation</span>
+        <input id="node_animation" type="checkbox" ${c.node_animation !== false ? 'checked' : ''} />
+      </div>
+
+      <h4>Entity IDs</h4>
+      <div class="grid">${entRows}</div>
+
+      <h4>Node labels</h4>
+      <div class="grid3">${lblRows}</div>
+
+      <h4>Node positions (% of card width / height)</h4>
+      <div class="grid">${posRows}</div>
+    `;
+
+    const fire = () => this._fire(this._buildConfig());
+
+    ['bg','bg_night','bg_day_rain','bg_day_heavy','bg_night_rain','bg_night_heavy','weather_entity']
+      .forEach(id => this.shadowRoot.getElementById(id).addEventListener('change', fire));
+
+    const opEl  = this.shadowRoot.getElementById('node_opacity');
+    const opVal = this.shadowRoot.getElementById('opacity-val');
+    opEl.addEventListener('input',  () => { opVal.textContent = parseFloat(opEl.value).toFixed(2); });
+    opEl.addEventListener('change', fire);
+
+    this.shadowRoot.getElementById('node_animation').addEventListener('change', fire);
+
+    this.shadowRoot.querySelectorAll('[data-ent]').forEach(el => el.addEventListener('change', fire));
+    this.shadowRoot.querySelectorAll('[data-lbl]').forEach(el => el.addEventListener('change', fire));
+    this.shadowRoot.querySelectorAll('[data-pos]').forEach(el => el.addEventListener('change', fire));
+  }
+
+  _buildConfig() {
+    const sr  = this.shadowRoot;
+    const cfg = { ...this._config };
+
+    const bgMap = [
+      ['bg',             'background'],
+      ['bg_night',       'background_night'],
+      ['bg_day_rain',    'background_day_rain'],
+      ['bg_day_heavy',   'background_day_heavy_rain'],
+      ['bg_night_rain',  'background_night_rain'],
+      ['bg_night_heavy', 'background_night_heavy_rain'],
+      ['weather_entity', 'weather_entity'],
+    ];
+    bgMap.forEach(([id, key]) => {
+      const val = sr.getElementById(id).value.trim();
+      if (val) cfg[key] = val; else delete cfg[key];
+    });
+
+    cfg.node_opacity   = parseFloat(sr.getElementById('node_opacity').value);
+    cfg.node_animation = sr.getElementById('node_animation').checked;
+
+    const entities = {};
+    sr.querySelectorAll('[data-ent]').forEach(el => {
+      const val = el.value.trim();
+      if (val) entities[el.dataset.ent] = val;
+    });
+    if (Object.keys(entities).length) cfg.entities = entities; else delete cfg.entities;
+
+    const labels = {};
+    sr.querySelectorAll('[data-lbl]').forEach(el => {
+      const val = el.value.trim();
+      if (val) labels[el.dataset.lbl] = val;
+    });
+    if (Object.keys(labels).length) cfg.node_labels = labels; else delete cfg.node_labels;
+
+    const nodes = {};
+    sr.querySelectorAll('[data-pos]').forEach(el => {
+      const key  = el.dataset.pos;
+      const axis = el.dataset.axis;
+      if (!nodes[key]) nodes[key] = {};
+      nodes[key][axis] = parseFloat(el.value);
+    });
+    if (Object.keys(nodes).length) cfg.nodes = nodes; else delete cfg.nodes;
+
+    return cfg;
+  }
+
+  _fire(config) {
+    this._config = config;
+    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
+  }
+}
+
+customElements.define('energy-flow-card-editor', EnergyFlowCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
