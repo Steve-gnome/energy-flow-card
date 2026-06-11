@@ -186,7 +186,7 @@ const TEMPLATE = `
     transition: transform 0.2s ease, border-color 0.4s, box-shadow 0.4s;
   }
 
-  .node-icon  { font-size: 22px; line-height: 1; }
+  .node-icon  { width: 28px; height: 28px; display: block; }
 
   .node-label {
     font-family: var(--font-main);
@@ -349,7 +349,7 @@ const TEMPLATE = `
   <div class="node" id="node-solar">
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#f5c842"></span>
-      <span class="node-icon">☀️</span>
+      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#f5c842"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       <span class="node-label">Solar</span>
       <span class="node-value" id="val-solar">–</span>
     </div>
@@ -358,7 +358,7 @@ const TEMPLATE = `
   <div class="node" id="node-home">
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#4fc3f7"></span>
-      <span class="node-icon">🏠</span>
+      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#4fc3f7"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
       <span class="node-label">Home</span>
       <span class="node-value" id="val-home">–</span>
     </div>
@@ -368,7 +368,7 @@ const TEMPLATE = `
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#66bb6a"></span>
       <div class="batt-gauge"><div class="gauge-nub"></div><div class="gauge-body"><div class="gauge-fill" id="gauge-battery-fill" style="height:0%"></div></div></div>
-      <span class="node-icon" id="batt-icon">🔋</span>
+      <svg class="node-icon" id="batt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#66bb6a"><rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><line x1="6" y1="11" x2="6" y2="14" stroke-width="2.5"/><line x1="10" y1="11" x2="10" y2="14" stroke-width="2.5"/></svg>
       <span class="node-label">Battery</span>
       <span class="node-sub" id="val-batt-pct">–%</span>
       <span class="node-value" id="val-battery">–</span>
@@ -378,7 +378,7 @@ const TEMPLATE = `
   <div class="node" id="node-grid">
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#ba68c8"></span>
-      <span class="node-icon">⚡</span>
+      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#ba68c8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="rgba(186,104,200,0.2)"/></svg>
       <span class="node-label">Grid</span>
       <span class="node-value" id="val-grid">–</span>
       <span class="node-sub" id="val-grid-dir">idle</span>
@@ -389,7 +389,7 @@ const TEMPLATE = `
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#26c6da"></span>
       <div class="batt-gauge"><div class="gauge-nub"></div><div class="gauge-body"><div class="gauge-fill" id="gauge-ev-fill" style="height:0%"></div></div></div>
-      <span class="node-icon">🚗</span>
+      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#26c6da"><rect x="1" y="10" width="22" height="8" rx="2"/><path d="M5 10V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2"/><circle cx="7" cy="18" r="1.5" fill="currentColor"/><circle cx="17" cy="18" r="1.5" fill="currentColor"/><line x1="9" y1="13" x2="11" y2="13" stroke-width="2"/><line x1="13" y1="13" x2="15" y2="13" stroke-width="2"/></svg>
       <span class="node-label">EV</span>
       <span class="node-sub" id="val-ev-pct">–%</span>
       <span class="node-value" id="val-ev">–</span>
@@ -429,7 +429,7 @@ class EnergyFlowCard extends HTMLElement {
       grid: 0, evPower: 0, evBattPct: 0,
       flows: {
         solarHome: false, solarBatt: false, solarGrid: false,
-        battHome:  false, gridHome:  false, gridBatt: false,
+        battHome:  false, gridHome:  false,
         solarEv:   false, battEv:    false, gridEv: false,
       },
     };
@@ -584,7 +584,16 @@ class EnergyFlowCard extends HTMLElement {
     sr.getElementById('val-ev').innerHTML         = fmtKw(evPower);
     sr.getElementById('val-ev-pct').textContent   = evBattPct.toFixed(0) + '%';
 
-    sr.getElementById('batt-icon').textContent = battCharging ? '🔋⚡' : battDischarge ? '🔋→' : '🔋';
+    const battIconEl = sr.getElementById('batt-icon');
+    if (battIconEl) {
+      if (battCharging) {
+        battIconEl.innerHTML = '<rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><polygon points="12 9 8 14 12 14 10 18 16 12 12 12 14 9" fill="rgba(102,187,106,0.8)" stroke-width="1"/>';
+      } else if (battDischarge) {
+        battIconEl.innerHTML = '<rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><line x1="7" y1="12.5" x2="15" y2="12.5" stroke-width="2.5"/><polyline points="12 10 15 12.5 12 15" stroke-width="2"/>';
+      } else {
+        battIconEl.innerHTML = '<rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><line x1="6" y1="11" x2="6" y2="14" stroke-width="2.5"/><line x1="10" y1="11" x2="10" y2="14" stroke-width="2.5"/>';
+      }
+    }
     sr.getElementById('gauge-battery-fill').style.height = Math.min(Math.max(powerwallPct, 0), 100) + '%';
     sr.getElementById('gauge-ev-fill').style.height      = Math.min(Math.max(evBattPct,    0), 100) + '%';
 
