@@ -186,7 +186,7 @@ const TEMPLATE = `
     transition: transform 0.2s ease, border-color 0.4s, box-shadow 0.4s;
   }
 
-  .node-icon  { width: 28px; height: 28px; display: block; }
+  .node-icon  { width: 36px; height: 36px; display: block; --mdc-icon-size: 36px; }
 
   .node-label {
     font-family: var(--font-main);
@@ -349,7 +349,7 @@ const TEMPLATE = `
   <div class="node" id="node-solar">
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#f5c842"></span>
-      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#f5c842"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <ha-icon class="node-icon" icon="mdi:solar-power-variant"></ha-icon>
       <span class="node-label">Solar</span>
       <span class="node-value" id="val-solar">–</span>
     </div>
@@ -358,7 +358,7 @@ const TEMPLATE = `
   <div class="node" id="node-home">
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#4fc3f7"></span>
-      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#4fc3f7"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+      <ha-icon class="node-icon" icon="mdi:home-lightning-bolt"></ha-icon>
       <span class="node-label">Home</span>
       <span class="node-value" id="val-home">–</span>
     </div>
@@ -368,7 +368,7 @@ const TEMPLATE = `
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#66bb6a"></span>
       <div class="batt-gauge"><div class="gauge-nub"></div><div class="gauge-body"><div class="gauge-fill" id="gauge-battery-fill" style="height:0%"></div></div></div>
-      <svg class="node-icon" id="batt-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#66bb6a"><rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><line x1="6" y1="11" x2="6" y2="14" stroke-width="2.5"/><line x1="10" y1="11" x2="10" y2="14" stroke-width="2.5"/></svg>
+      <ha-icon class="node-icon" id="batt-icon" icon="mdi:battery-medium"></ha-icon>
       <span class="node-label">Battery</span>
       <span class="node-sub" id="val-batt-pct">–%</span>
       <span class="node-value" id="val-battery">–</span>
@@ -378,7 +378,7 @@ const TEMPLATE = `
   <div class="node" id="node-grid">
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#ba68c8"></span>
-      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#ba68c8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="rgba(186,104,200,0.2)"/></svg>
+      <ha-icon class="node-icon" icon="mdi:transmission-tower"></ha-icon>
       <span class="node-label">Grid</span>
       <span class="node-value" id="val-grid">–</span>
       <span class="node-sub" id="val-grid-dir">idle</span>
@@ -389,7 +389,7 @@ const TEMPLATE = `
     <div class="node-bubble">
       <span class="pulse-ring" style="color:#26c6da"></span>
       <div class="batt-gauge"><div class="gauge-nub"></div><div class="gauge-body"><div class="gauge-fill" id="gauge-ev-fill" style="height:0%"></div></div></div>
-      <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:#26c6da"><rect x="1" y="10" width="22" height="8" rx="2"/><path d="M5 10V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2"/><circle cx="7" cy="18" r="1.5" fill="currentColor"/><circle cx="17" cy="18" r="1.5" fill="currentColor"/><line x1="9" y1="13" x2="11" y2="13" stroke-width="2"/><line x1="13" y1="13" x2="15" y2="13" stroke-width="2"/></svg>
+      <ha-icon class="node-icon" icon="mdi:car-electric"></ha-icon>
       <span class="node-label">EV</span>
       <span class="node-sub" id="val-ev-pct">–%</span>
       <span class="node-value" id="val-ev">–</span>
@@ -586,13 +586,30 @@ class EnergyFlowCard extends HTMLElement {
 
     const battIconEl = sr.getElementById('batt-icon');
     if (battIconEl) {
+      const pct = Math.round(powerwallPct / 10) * 10;
+      let icon;
       if (battCharging) {
-        battIconEl.innerHTML = '<rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><polygon points="12 9 8 14 12 14 10 18 16 12 12 12 14 9" fill="rgba(102,187,106,0.8)" stroke-width="1"/>';
-      } else if (battDischarge) {
-        battIconEl.innerHTML = '<rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><line x1="7" y1="12.5" x2="15" y2="12.5" stroke-width="2.5"/><polyline points="12 10 15 12.5 12 15" stroke-width="2"/>';
+        icon = pct <= 10 ? 'mdi:battery-charging-10' :
+               pct <= 20 ? 'mdi:battery-charging-20' :
+               pct <= 30 ? 'mdi:battery-charging-30' :
+               pct <= 40 ? 'mdi:battery-charging-40' :
+               pct <= 50 ? 'mdi:battery-charging-50' :
+               pct <= 60 ? 'mdi:battery-charging-60' :
+               pct <= 70 ? 'mdi:battery-charging-70' :
+               pct <= 80 ? 'mdi:battery-charging-80' :
+               pct <= 90 ? 'mdi:battery-charging-90' : 'mdi:battery-charging-100';
       } else {
-        battIconEl.innerHTML = '<rect x="2" y="7" width="18" height="11" rx="2"/><path d="M22 11v3"/><line x1="6" y1="11" x2="6" y2="14" stroke-width="2.5"/><line x1="10" y1="11" x2="10" y2="14" stroke-width="2.5"/>';
+        icon = pct <= 10 ? 'mdi:battery-10' :
+               pct <= 20 ? 'mdi:battery-20' :
+               pct <= 30 ? 'mdi:battery-30' :
+               pct <= 40 ? 'mdi:battery-40' :
+               pct <= 50 ? 'mdi:battery-50' :
+               pct <= 60 ? 'mdi:battery-60' :
+               pct <= 70 ? 'mdi:battery-70' :
+               pct <= 80 ? 'mdi:battery-80' :
+               pct <= 90 ? 'mdi:battery-90' : 'mdi:battery';
       }
+      battIconEl.setAttribute('icon', icon);
     }
     sr.getElementById('gauge-battery-fill').style.height = Math.min(Math.max(powerwallPct, 0), 100) + '%';
     sr.getElementById('gauge-ev-fill').style.height      = Math.min(Math.max(evBattPct,    0), 100) + '%';
