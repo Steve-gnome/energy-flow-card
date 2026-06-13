@@ -26,12 +26,6 @@
  * # Weather entity for background switching (optional)
  * weather_entity: weather.your_location
  *
- * # Card aspect ratio (width / height). Controls how tall the card grows
- * # as it gets wider, e.g. with the "full width" layout option. Set this
- * # to match the aspect ratio of your background images to avoid them
- * # being cropped top/bottom (default 16 / 9).
- * aspect_ratio: 16 / 9
- *
  * # Node opacity (0.0 = fully transparent, 1.0 = fully opaque)
  * node_opacity: 0.4
  *
@@ -63,6 +57,22 @@
  *   grid:          sensor.grid_power         # negative = export, positive = import
  *   ev_power:      sensor.ev_charging_power
  *   ev_pct:        sensor.ev_battery_level
+ *
+ * # Card aspect ratio (width / height). Controls how tall the card grows
+ * # as it gets wider, e.g. with the "full width" layout option. Set this
+ * # to match the aspect ratio of your background images to avoid them
+ * # being cropped top/bottom (default 16 / 9).
+ * aspect_ratio: 16 / 9
+ *
+ * # Tap-to-navigate per node. Tapping a node navigates to the given
+ * # dashboard path (must start with "/"), or opens an external URL in a
+ * # new tab otherwise. Omit a node to leave it non-interactive.
+ * node_actions:
+ *   solar:     /lovelace-energy/solar
+ *   home:      /lovelace-energy/home
+ *   powerwall: /lovelace-energy/battery
+ *   grid:      /lovelace-energy/grid
+ *   ev:        /lovelace-energy/ev
  *
  * # Flow thresholds (kW) — minimum power to show a flow line
  * threshold_solar:   0.05
@@ -473,7 +483,46 @@ class EnergyFlowCard extends HTMLElement {
 
   connectedCallback()    { if (this._hass && !this._rafId) this._startRender(); }
   disconnectedCallback() { this._stopRender(); }
-  getCardSize()          { return 6; }
+
+  // Parse "W / H" aspect-ratio strings (e.g. "16 / 9") into a numeric
+  // width/height ratio. Falls back to the default on anything invalid.
+  _parseAspectRatio(ratioStr) {
+    const parts = String(ratioStr).split('/').map(p => parseFloat(p.trim()));
+    return (parts.length === 2 && parts[0] > 0 && parts[1] > 0) ? parts[0] / parts[1] : 16 / 9;
+  }
+
+  getCardSize() {
+    // Estimate the rendered height (in Lovelace "row" units, ~50px each)
+    // from the configured aspect ratio, so the masonry layout reserves
+    // enough vertical space and the next row doesn't overlap the card.
+    // ASSUMED_WIDTH approximates a typical single masonry column; cards
+    // placed at "full width" (spanning multiple columns) will still be
+    // taller than this estimate and may need a larger row/grid span set
+    // explicitly in the dashboard layout.
+    const ratio = this._parseAspectRatio((this._config && this._config.aspect_ratio) || DEFAULT_ASPECT_RATIO);
+    const ASSUMED_WIDTH = 500;
+    const ROW_UNIT      = 50;
+    return Math.max(1, Math.ceil((ASSUMED_WIDTH / ratio) / ROW_UNIT));
+  }
+
+  getGridOptions() {
+    // Sections view: each section is 12 columns wide, and grid cells are
+    // roughly square (cell height ~= cell width = section width / 12).
+    // For a card spanning all 12 columns, the height needed to match the
+    // configured aspect ratio is therefore ~ 12 / ratio rows. This keeps
+    // "Auto" sizing (and full-width cards) from collapsing to 1 row and
+    // overlapping the row below, while min_rows/max_rows still allow
+    // manual fine-tuning via the section's resize handle.
+    const ratio = this._parseAspectRatio((this._config && this._config.aspect_ratio) || DEFAULT_ASPECT_RATIO);
+    const rows  = Math.max(1, Math.round(12 / ratio));
+    return {
+      columns:     12,
+      rows,
+      min_rows:    Math.max(1, rows - 2),
+      max_rows:    rows + 6,
+      min_columns: 6,
+    };
+  }
 
   static getConfigElement() {
     return document.createElement('energy-flow-card-editor');
@@ -514,6 +563,38 @@ class EnergyFlowCard extends HTMLElement {
       .forEach(r => r.style.animationName = animate ? '' : 'none');
 
     this._applyLabels();
+    this._applyActions();
+  }
+
+  _applyActions() {
+    const actions = this._config.node_actions || {};
+    const NODE_KEYS = ['solar', 'home', 'powerwall', 'grid', 'ev'];
+    NODE_KEYS.forEach(key => {
+      const el = this.shadowRoot.getElementById('node-' + key);
+      if (!el) return;
+
+      if (el._efcNavHandler) {
+        el.removeEventListener('click', el._efcNavHandler);
+        el._efcNavHandler = null;
+      }
+
+      const path = actions[key];
+      if (path) {
+        el.style.cursor = 'pointer';
+        const handler = () => {
+          if (path.startsWith('/')) {
+            history.pushState(null, '', path);
+            window.dispatchEvent(new CustomEvent('location-changed', { bubbles: true, composed: true }));
+          } else {
+            window.open(path, '_blank');
+          }
+        };
+        el._efcNavHandler = handler;
+        el.addEventListener('click', handler);
+      } else {
+        el.style.cursor = 'default';
+      }
+    });
   }
 
   _applyLabels() {
@@ -622,7 +703,7 @@ class EnergyFlowCard extends HTMLElement {
     sr.getElementById('val-home').innerHTML       = fmtKw(home);
     sr.getElementById('val-battery').innerHTML    = fmtKw(powerwall);
     const battPctEl = sr.getElementById('val-batt-pct');
-    if (battPctEl) battPctEl.textContent = Number(powerwallPct).toFixed(1) + '%';
+    if (battPctEl) battPctEl.textContent = Math.round(powerwallPct) + '%';
     sr.getElementById('val-grid').innerHTML       = fmtKw(grid);
     sr.getElementById('val-grid-dir').textContent = gridImport ? 'importing' : gridExport ? 'exporting' : 'idle';
     sr.getElementById('val-ev').innerHTML         = fmtKw(evPower);
@@ -846,6 +927,12 @@ class EnergyFlowCardEditor extends HTMLElement {
         <input data-lbl="${k}" type="text" value="${nlbl[k] || ''}" placeholder="${DEF_LBL[k]}" />
       </label>`).join('');
 
+    const actions = c.node_actions || {};
+    const actRows = NODE_KEYS.map(k => `
+      <label>${DEF_LBL[k]}
+        <input data-action="${k}" type="text" value="${actions[k] || ''}" placeholder="/lovelace-energy/${k}" />
+      </label>`).join('');
+
     const posRows = NODE_KEYS.map(k => `
       <label>${DEF_LBL[k]} left (%)
         <input data-pos="${k}" data-axis="left" type="number" min="0" max="100"
@@ -933,6 +1020,9 @@ class EnergyFlowCardEditor extends HTMLElement {
       <h4>Node labels</h4>
       <div class="grid3">${lblRows}</div>
 
+      <h4>Tap actions (navigate)</h4>
+      <div class="grid3">${actRows}</div>
+
       <h4>Node positions (% of card width / height)</h4>
       <div class="grid">${posRows}</div>
 
@@ -975,6 +1065,7 @@ class EnergyFlowCardEditor extends HTMLElement {
 
     this.shadowRoot.querySelectorAll('[data-ent]').forEach(el => el.addEventListener('change', fire));
     this.shadowRoot.querySelectorAll('[data-lbl]').forEach(el => el.addEventListener('change', fire));
+    this.shadowRoot.querySelectorAll('[data-action]').forEach(el => el.addEventListener('change', fire));
     this.shadowRoot.querySelectorAll('[data-pos]').forEach(el => el.addEventListener('change', fire));
     this.shadowRoot.querySelectorAll('[data-thr]').forEach(el => el.addEventListener('change', fire));
   }
@@ -1014,6 +1105,13 @@ class EnergyFlowCardEditor extends HTMLElement {
       if (val) labels[el.dataset.lbl] = val;
     });
     if (Object.keys(labels).length) cfg.node_labels = labels; else delete cfg.node_labels;
+
+    const actions = {};
+    sr.querySelectorAll('[data-action]').forEach(el => {
+      const val = el.value.trim();
+      if (val) actions[el.dataset.action] = val;
+    });
+    if (Object.keys(actions).length) cfg.node_actions = actions; else delete cfg.node_actions;
 
     const nodes = {};
     sr.querySelectorAll('[data-pos]').forEach(el => {
