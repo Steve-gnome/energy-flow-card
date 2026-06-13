@@ -26,6 +26,12 @@
  * # Weather entity for background switching (optional)
  * weather_entity: weather.your_location
  *
+ * # Card aspect ratio (width / height). Controls how tall the card grows
+ * # as it gets wider, e.g. with the "full width" layout option. Set this
+ * # to match the aspect ratio of your background images to avoid them
+ * # being cropped top/bottom (default 16 / 9).
+ * aspect_ratio: 16 / 9
+ *
  * # Node opacity (0.0 = fully transparent, 1.0 = fully opaque)
  * node_opacity: 0.4
  *
@@ -102,6 +108,9 @@ const DEFAULT_ENTITIES = {
   ev_pct:        'sensor.ev_battery_level',
 };
 
+// ── Default aspect ratio (width / height) ────────────────
+const DEFAULT_ASPECT_RATIO = '16 / 9';
+
 // ── Node colours ─────────────────────────────────────────
 const COLORS = {
   solar:     { r: 245, g: 200, b: 66  },
@@ -118,7 +127,8 @@ const TEMPLATE = `
   :host {
     display: block;
     width: 100%;
-    height: 100%;
+    height: auto;
+    aspect-ratio: var(--efc-aspect-ratio, 16 / 9);
     --solar-color:     #f5c842;
     --home-color:      #4fc3f7;
     --powerwall-color: #66bb6a;
@@ -487,6 +497,9 @@ class EnergyFlowCard extends HTMLElement {
   }
 
   _applyPositions() {
+    const ratio = this._config.aspect_ratio || DEFAULT_ASPECT_RATIO;
+    this.style.setProperty('--efc-aspect-ratio', ratio);
+
     const nodeCfg = Object.assign({}, DEFAULT_NODES, this._config.nodes || {});
     for (const [key, pos] of Object.entries(nodeCfg)) {
       const el = this.shadowRoot.getElementById('node-' + key);
@@ -899,6 +912,9 @@ class EnergyFlowCardEditor extends HTMLElement {
       </label>
 
       <h4>Appearance</h4>
+      <label>Aspect ratio (width / height)
+        <input id="aspect_ratio" type="text" value="${c.aspect_ratio || ''}" placeholder="16 / 9" />
+      </label>
       <label>Node opacity
         <div class="range-row">
           <input id="node_opacity" type="range" min="0" max="1" step="0.05"
@@ -947,7 +963,7 @@ class EnergyFlowCardEditor extends HTMLElement {
 
     const fire = () => this._fire(this._buildConfig());
 
-    ['bg','bg_night','bg_day_rain','bg_day_heavy','bg_night_rain','bg_night_heavy','weather_entity']
+    ['bg','bg_night','bg_day_rain','bg_day_heavy','bg_night_rain','bg_night_heavy','weather_entity','aspect_ratio']
       .forEach(id => this.shadowRoot.getElementById(id).addEventListener('change', fire));
 
     const opEl  = this.shadowRoot.getElementById('node_opacity');
@@ -975,6 +991,7 @@ class EnergyFlowCardEditor extends HTMLElement {
       ['bg_night_rain',  'background_night_rain'],
       ['bg_night_heavy', 'background_night_heavy_rain'],
       ['weather_entity', 'weather_entity'],
+      ['aspect_ratio',   'aspect_ratio'],
     ];
     bgMap.forEach(([id, key]) => {
       const val = sr.getElementById(id).value.trim();
