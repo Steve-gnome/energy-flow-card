@@ -582,12 +582,20 @@ class EnergyFlowCard extends HTMLElement {
     const gridExport    = grid     < -t.grid;
     const evCharging    = evPower  >  t.ev;
 
+    // Allocate home's load across sources (solar first, then battery
+    // discharge, with anything left over coming from the grid). This lets
+    // grid -> home show up even while the battery/EV are also drawing
+    // from the grid at the same time.
+    const solarToHome   = Math.min(Math.max(solar, 0), home);
+    const battToHome    = battDischarge ? Math.min(powerwall, Math.max(home - solarToHome, 0)) : 0;
+    const homeShortfall = home - solarToHome - battToHome;
+
     s.flows = {
-      solarHome: solarActive  && home > t.home,
+      solarHome: solarActive  && solarToHome > t.home,
       solarBatt: solarActive  && battCharging && !gridImport,
       solarGrid: solarActive  && gridExport,
-      battHome:  battDischarge,
-      gridHome:  gridImport   && !battCharging,
+      battHome:  battDischarge && battToHome > t.home,
+      gridHome:  gridImport   && homeShortfall > t.home,
       gridBatt:  gridImport   && battCharging,
       solarEv:   evCharging   && solarActive && !gridImport,
       battEv:    evCharging   && battDischarge,
