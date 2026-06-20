@@ -73,13 +73,6 @@
  *   powerwall: /lovelace-energy/battery
  *   grid:      /lovelace-energy/grid
  *   ev:        /lovelace-energy/ev
- *
- * # Flow thresholds (kW) — minimum power to show a flow line
- * threshold_solar:   0.05
- * threshold_home:    0.05
- * threshold_battery: 0.03
- * threshold_grid:    0.40
- * threshold_ev:      0.05
  */
 
 // ── Flow thresholds (kW) ─────────────────────────────────
@@ -350,6 +343,18 @@ const TEMPLATE = `
   .flow-tag.grid   { color: #ba68c8; border-color: rgba(186,104,200,0.5); }
   .flow-tag.ev     { color: #26c6da; border-color: rgba(38,198,218,0.5);  }
 
+  .tag-kw {
+    font-family: var(--font-mono);
+    margin-left: 5px;
+    opacity: 0.85;
+    letter-spacing: 0;
+  }
+
+  .status-linebreak {
+    flex-basis: 100%;
+    height: 0;
+  }
+
   /* ── Pulse ring ── */
   @keyframes pulse-ring {
     0%   { transform: scale(1);   opacity: 0.7; }
@@ -429,15 +434,16 @@ const TEMPLATE = `
       <span class="status-text" id="status-text">Connecting…</span>
     </div>
     <div class="status-divider"></div>
-    <span class="flow-tag solar" id="tag-solar-home">Solar → Home</span>
-    <span class="flow-tag solar" id="tag-solar-batt">Solar → Battery</span>
-    <span class="flow-tag solar" id="tag-solar-grid">Solar → Grid</span>
-    <span class="flow-tag batt"  id="tag-batt-home">Battery → Home</span>
-    <span class="flow-tag grid"  id="tag-grid-home">Grid → Home</span>
-    <span class="flow-tag grid"  id="tag-grid-batt">Grid → Battery</span>
-    <span class="flow-tag ev"    id="tag-solar-ev">Solar → EV</span>
-    <span class="flow-tag ev"    id="tag-batt-ev">Battery → EV</span>
-    <span class="flow-tag ev"    id="tag-grid-ev">Grid → EV</span>
+    <span class="flow-tag solar" id="tag-solar-home">Solar → Home<span class="tag-kw" id="kw-solar-home"></span></span>
+    <span class="flow-tag solar" id="tag-solar-batt">Solar → Battery<span class="tag-kw" id="kw-solar-batt"></span></span>
+    <span class="flow-tag solar" id="tag-solar-grid">Solar → Grid<span class="tag-kw" id="kw-solar-grid"></span></span>
+    <span class="flow-tag batt"  id="tag-batt-home">Battery → Home<span class="tag-kw" id="kw-batt-home"></span></span>
+    <span class="flow-tag grid"  id="tag-grid-home">Grid → Home<span class="tag-kw" id="kw-grid-home"></span></span>
+    <span class="flow-tag grid"  id="tag-grid-batt">Grid → Battery<span class="tag-kw" id="kw-grid-batt"></span></span>
+    <div class="status-linebreak"></div>
+    <span class="flow-tag ev"    id="tag-solar-ev">Solar → EV<span class="tag-kw" id="kw-solar-ev"></span></span>
+    <span class="flow-tag ev"    id="tag-batt-ev">Battery → EV<span class="tag-kw" id="kw-batt-ev"></span></span>
+    <span class="flow-tag ev"    id="tag-grid-ev">Grid → EV<span class="tag-kw" id="kw-grid-ev"></span></span>
   </div>
 </div>
 `;
@@ -684,16 +690,33 @@ class EnergyFlowCard extends HTMLElement {
     const battToHome    = battDischarge ? Math.min(powerwall, Math.max(home - solarToHome, 0)) : 0;
     const homeShortfall = home - solarToHome - battToHome;
 
+    // Remaining excess solar after home is allocated to the battery
+    // first, then the EV — same waterfall pattern as above. This lets
+    // solar -> battery / solar -> EV show up alongside grid -> battery /
+    // grid -> EV when solar alone isn't enough to fully cover the load,
+    // instead of grid importing at all blanking out the solar flow.
+    const excessSolar   = Math.max(solar - solarToHome, 0);
+    const battChargeMag = battCharging ? Math.abs(powerwall) : 0;
+    const solarToBatt   = Math.min(excessSolar, battChargeMag);
+    const gridToBatt    = Math.max(battChargeMag - solarToBatt, 0);
+
+    const solarLeftAfterBatt = Math.max(excessSolar - solarToBatt, 0);
+    const evChargeMag        = evCharging ? evPower : 0;
+    const solarToEv           = Math.min(solarLeftAfterBatt, evChargeMag);
+    const evShortfallAfterSolar = Math.max(evChargeMag - solarToEv, 0);
+    const battToEv            = battDischarge ? Math.min(Math.max(powerwall - battToHome, 0), evShortfallAfterSolar) : 0;
+    const gridToEv             = Math.max(evChargeMag - solarToEv - battToEv, 0);
+
     s.flows = {
       solarHome: solarActive  && solarToHome > t.home,
-      solarBatt: solarActive  && battCharging && !gridImport,
+      solarBatt: battCharging && solarToBatt > t.battery,
       solarGrid: solarActive  && gridExport,
       battHome:  battDischarge && battToHome > t.home,
       gridHome:  gridImport   && homeShortfall > t.home,
-      gridBatt:  gridImport   && battCharging,
-      solarEv:   evCharging   && solarActive && !gridImport,
-      battEv:    evCharging   && battDischarge,
-      gridEv:    evCharging   && gridImport,
+      gridBatt:  battCharging && gridToBatt > t.battery,
+      solarEv:   evCharging   && solarToEv > t.ev,
+      battEv:    evCharging   && battToEv  > t.ev,
+      gridEv:    evCharging   && gridToEv  > t.ev,
     };
 
     const sr    = this.shadowRoot;
@@ -745,15 +768,15 @@ class EnergyFlowCard extends HTMLElement {
     this._toggleActive('node-grid',      gridImport || gridExport);
     this._toggleActive('node-ev',        evCharging);
 
-    this._setTag('tag-solar-home', s.flows.solarHome);
-    this._setTag('tag-solar-batt', s.flows.solarBatt);
-    this._setTag('tag-solar-grid', s.flows.solarGrid);
-    this._setTag('tag-batt-home',  s.flows.battHome);
-    this._setTag('tag-grid-home',  s.flows.gridHome);
-    this._setTag('tag-grid-batt',  s.flows.gridBatt);
-    this._setTag('tag-solar-ev',   s.flows.solarEv);
-    this._setTag('tag-batt-ev',    s.flows.battEv);
-    this._setTag('tag-grid-ev',    s.flows.gridEv);
+    this._setTag('tag-solar-home', s.flows.solarHome, solarToHome);
+    this._setTag('tag-solar-batt', s.flows.solarBatt, solarToBatt);
+    this._setTag('tag-solar-grid', s.flows.solarGrid, Math.abs(grid));
+    this._setTag('tag-batt-home',  s.flows.battHome,  battToHome);
+    this._setTag('tag-grid-home',  s.flows.gridHome,  homeShortfall);
+    this._setTag('tag-grid-batt',  s.flows.gridBatt,  gridToBatt);
+    this._setTag('tag-solar-ev',   s.flows.solarEv,   solarToEv);
+    this._setTag('tag-batt-ev',    s.flows.battEv,    battToEv);
+    this._setTag('tag-grid-ev',    s.flows.gridEv,    gridToEv);
 
     sr.getElementById('status-dot').className    = 'status-dot';
     sr.getElementById('status-text').textContent = 'Live';
@@ -766,9 +789,12 @@ class EnergyFlowCard extends HTMLElement {
     if (el) el.classList.toggle('active', !!on);
   }
 
-  _setTag(id, on) {
+  _setTag(id, on, kw) {
     const el = this.shadowRoot.getElementById(id);
-    if (el) el.classList.toggle('active', !!on);
+    if (!el) return;
+    el.classList.toggle('active', !!on);
+    const kwEl = el.querySelector('.tag-kw');
+    if (kwEl) kwEl.textContent = (on && kw !== undefined) ? `${kw.toFixed(1)}kW` : '';
   }
 
   // ── Canvas animation ───────────────────────────────────
