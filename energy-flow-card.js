@@ -334,10 +334,10 @@ const TEMPLATE = `
     letter-spacing: 0.1em; text-transform: uppercase;
     padding: 3px 8px; border-radius: 20px;
     border: 1px solid transparent;
-    opacity: 0.4;
-    transition: opacity 0.4s, border-color 0.4s, color 0.4s;
+    display: none;
+    transition: border-color 0.4s, color 0.4s;
   }
-  .flow-tag.active { opacity: 1; }
+  .flow-tag.active { display: inline-flex; align-items: center; }
   .flow-tag.solar  { color: #f5c842; border-color: rgba(245,200,66,0.5);  }
   .flow-tag.batt   { color: #66bb6a; border-color: rgba(102,187,106,0.5); }
   .flow-tag.grid   { color: #ba68c8; border-color: rgba(186,104,200,0.5); }
@@ -348,11 +348,6 @@ const TEMPLATE = `
     margin-left: 5px;
     opacity: 0.85;
     letter-spacing: 0;
-  }
-
-  .status-linebreak {
-    flex-basis: 100%;
-    height: 0;
   }
 
   /* ── Pulse ring ── */
@@ -440,7 +435,6 @@ const TEMPLATE = `
     <span class="flow-tag batt"  id="tag-batt-home">Battery → Home<span class="tag-kw" id="kw-batt-home"></span></span>
     <span class="flow-tag grid"  id="tag-grid-home">Grid → Home<span class="tag-kw" id="kw-grid-home"></span></span>
     <span class="flow-tag grid"  id="tag-grid-batt">Grid → Battery<span class="tag-kw" id="kw-grid-batt"></span></span>
-    <div class="status-linebreak"></div>
     <span class="flow-tag ev"    id="tag-solar-ev">Solar → EV<span class="tag-kw" id="kw-solar-ev"></span></span>
     <span class="flow-tag ev"    id="tag-batt-ev">Battery → EV<span class="tag-kw" id="kw-batt-ev"></span></span>
     <span class="flow-tag ev"    id="tag-grid-ev">Grid → EV<span class="tag-kw" id="kw-grid-ev"></span></span>
