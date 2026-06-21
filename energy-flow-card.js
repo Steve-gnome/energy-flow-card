@@ -433,6 +433,7 @@ const TEMPLATE = `
     <span class="flow-tag solar" id="tag-solar-batt">Solar → Battery<span class="tag-kw" id="kw-solar-batt"></span></span>
     <span class="flow-tag solar" id="tag-solar-grid">Solar → Grid<span class="tag-kw" id="kw-solar-grid"></span></span>
     <span class="flow-tag batt"  id="tag-batt-home">Battery → Home<span class="tag-kw" id="kw-batt-home"></span></span>
+    <span class="flow-tag batt"  id="tag-batt-grid">Battery → Grid<span class="tag-kw" id="kw-batt-grid"></span></span>
     <span class="flow-tag grid"  id="tag-grid-home">Grid → Home<span class="tag-kw" id="kw-grid-home"></span></span>
     <span class="flow-tag grid"  id="tag-grid-batt">Grid → Battery<span class="tag-kw" id="kw-grid-batt"></span></span>
     <span class="flow-tag ev"    id="tag-solar-ev">Solar → EV<span class="tag-kw" id="kw-solar-ev"></span></span>
@@ -456,7 +457,8 @@ class EnergyFlowCard extends HTMLElement {
       grid: 0, evPower: 0, evBattPct: 0,
       flows: {
         solarHome: false, solarBatt: false, solarGrid: false,
-        battHome:  false, gridHome:  false,
+        battHome:  false, battGrid:  false,
+        gridHome:  false, gridBatt:  false,
         solarEv:   false, battEv:    false, gridEv: false,
       },
     };
@@ -676,37 +678,50 @@ class EnergyFlowCard extends HTMLElement {
     const gridExport    = grid     < -t.grid;
     const evCharging    = evPower  >  t.ev;
 
-    // Allocate home's load across sources (solar first, then battery
-    // discharge, with anything left over coming from the grid). This lets
-    // grid -> home show up even while the battery/EV are also drawing
-    // from the grid at the same time.
-    const solarToHome   = Math.min(Math.max(solar, 0), home);
-    const battToHome    = battDischarge ? Math.min(powerwall, Math.max(home - solarToHome, 0)) : 0;
-    const homeShortfall = home - solarToHome - battToHome;
+    // ── Power allocation (source → sink waterfall) ─────────
+    // Sources: solar generation, battery discharge, grid import.
+    // Sinks:   home, EV, battery charge, grid export.
+    // Each sink is filled in priority order while tracking how much of
+    // every source remains, so one source can feed several sinks
+    // (e.g. battery → home AND battery → grid) without double-counting.
+    // This is what makes battery-to-grid export render correctly.
+    let solarRem = Math.max(solar, 0);
+    let battRem  = battDischarge ? powerwall : 0;        // discharge magnitude
+    let gridRem  = gridImport    ? grid      : 0;        // import magnitude
 
-    // Remaining excess solar after home is allocated to the battery
-    // first, then the EV — same waterfall pattern as above. This lets
-    // solar -> battery / solar -> EV show up alongside grid -> battery /
-    // grid -> EV when solar alone isn't enough to fully cover the load,
-    // instead of grid importing at all blanking out the solar flow.
-    const excessSolar   = Math.max(solar - solarToHome, 0);
     const battChargeMag = battCharging ? Math.abs(powerwall) : 0;
-    const solarToBatt   = Math.min(excessSolar, battChargeMag);
-    const gridToBatt    = Math.max(battChargeMag - solarToBatt, 0);
+    const evChargeMag   = evCharging   ? evPower             : 0;
+    const gridExportMag = gridExport   ? Math.abs(grid)      : 0;
 
-    const solarLeftAfterBatt = Math.max(excessSolar - solarToBatt, 0);
-    const evChargeMag        = evCharging ? evPower : 0;
-    const solarToEv           = Math.min(solarLeftAfterBatt, evChargeMag);
-    const evShortfallAfterSolar = Math.max(evChargeMag - solarToEv, 0);
-    const battToEv            = battDischarge ? Math.min(Math.max(powerwall - battToHome, 0), evShortfallAfterSolar) : 0;
-    const gridToEv             = Math.max(evChargeMag - solarToEv - battToEv, 0);
+    // Home: solar → battery → grid
+    const solarToHome = Math.min(solarRem, home);          solarRem -= solarToHome;
+    let   homeRem     = home - solarToHome;
+    const battToHome  = Math.min(battRem, homeRem);        battRem  -= battToHome; homeRem -= battToHome;
+    const gridToHome  = Math.min(gridRem, homeRem);        gridRem  -= gridToHome; homeRem -= gridToHome;
+
+    // EV: solar → battery → grid
+    const solarToEv = Math.min(solarRem, evChargeMag);     solarRem -= solarToEv;
+    let   evRem     = evChargeMag - solarToEv;
+    const battToEv  = Math.min(battRem, evRem);            battRem  -= battToEv;  evRem -= battToEv;
+    const gridToEv  = Math.min(gridRem, evRem);            gridRem  -= gridToEv;  evRem -= gridToEv;
+
+    // Battery charge: solar → grid
+    const solarToBatt = Math.min(solarRem, battChargeMag); solarRem -= solarToBatt;
+    let   battChgRem  = battChargeMag - solarToBatt;
+    const gridToBatt  = Math.min(gridRem, battChgRem);     gridRem  -= gridToBatt; battChgRem -= gridToBatt;
+
+    // Grid export: solar → battery
+    const solarToGrid = Math.min(solarRem, gridExportMag); solarRem -= solarToGrid;
+    let   gridExpRem  = gridExportMag - solarToGrid;
+    const battToGrid  = Math.min(battRem, gridExpRem);     battRem  -= battToGrid; gridExpRem -= battToGrid;
 
     s.flows = {
       solarHome: solarActive  && solarToHome > t.home,
       solarBatt: battCharging && solarToBatt > t.battery,
-      solarGrid: solarActive  && gridExport,
+      solarGrid: gridExport   && solarToGrid > t.grid,
       battHome:  battDischarge && battToHome > t.home,
-      gridHome:  gridImport   && homeShortfall > t.home,
+      battGrid:  gridExport   && battToGrid > t.grid,
+      gridHome:  gridImport   && gridToHome > t.home,
       gridBatt:  battCharging && gridToBatt > t.battery,
       solarEv:   evCharging   && solarToEv > t.ev,
       battEv:    evCharging   && battToEv  > t.ev,
@@ -764,9 +779,10 @@ class EnergyFlowCard extends HTMLElement {
 
     this._setTag('tag-solar-home', s.flows.solarHome, solarToHome);
     this._setTag('tag-solar-batt', s.flows.solarBatt, solarToBatt);
-    this._setTag('tag-solar-grid', s.flows.solarGrid, Math.abs(grid));
+    this._setTag('tag-solar-grid', s.flows.solarGrid, solarToGrid);
     this._setTag('tag-batt-home',  s.flows.battHome,  battToHome);
-    this._setTag('tag-grid-home',  s.flows.gridHome,  homeShortfall);
+    this._setTag('tag-batt-grid',  s.flows.battGrid,  battToGrid);
+    this._setTag('tag-grid-home',  s.flows.gridHome,  gridToHome);
     this._setTag('tag-grid-batt',  s.flows.gridBatt,  gridToBatt);
     this._setTag('tag-solar-ev',   s.flows.solarEv,   solarToEv);
     this._setTag('tag-batt-ev',    s.flows.battEv,    battToEv);
@@ -882,6 +898,7 @@ class EnergyFlowCard extends HTMLElement {
     this._drawFlow(ctx, 'grid',      'home',      'grid',      'home',      f.gridHome,  Math.abs(s.grid));
     this._drawFlow(ctx, 'grid',      'powerwall', 'grid',      'powerwall', f.gridBatt,  Math.abs(s.grid));
     this._drawFlow(ctx, 'powerwall', 'home',      'powerwall', 'home',      f.battHome,  Math.abs(s.powerwall));
+    this._drawFlow(ctx, 'powerwall', 'grid',      'powerwall', 'grid',      f.battGrid,  Math.abs(s.powerwall));
     this._drawFlow(ctx, 'solar',     'home',      'solar',     'home',      f.solarHome, s.solar);
     this._drawFlow(ctx, 'solar',     'ev',        'solar',     'ev',        f.solarEv,   s.solar);
     this._drawFlow(ctx, 'powerwall', 'ev',        'powerwall', 'ev',        f.battEv,    Math.abs(s.powerwall));
