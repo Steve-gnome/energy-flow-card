@@ -857,7 +857,7 @@ class EnergyFlowCard extends HTMLElement {
     const cp2 = { x: p0.x + dx*0.6, y: p3.y - dy*0.1 };
     const cf  = COLORS[cFrom], ct = COLORS[cTo];
 
-    const speed  = Math.min(Math.max(Math.abs(power) * 8, 3), 22);
+    const speed  = Math.min(Math.max(Math.abs(power) * 12, 5), 30);
     const offset = -(this._tick * speed) % 24;
     const grad   = ctx.createLinearGradient(p0.x, p0.y, p3.x, p3.y);
     grad.addColorStop(0,   this._rgba(cf, 0.9));
@@ -870,16 +870,6 @@ class EnergyFlowCard extends HTMLElement {
     ctx.strokeStyle = grad; ctx.lineWidth = 3.5;
     ctx.setLineDash([14, 10]); ctx.lineDashOffset = offset;
     ctx.stroke(); ctx.setLineDash([]);
-
-    const t  = ((this._tick * speed * 0.004) % 1 + 1) % 1, mt = 1 - t;
-    const pt = {
-      x: mt*mt*mt*p0.x + 3*mt*mt*t*cp1.x + 3*mt*t*t*cp2.x + t*t*t*p3.x,
-      y: mt*mt*mt*p0.y + 3*mt*mt*t*cp1.y + 3*mt*t*t*cp2.y + t*t*t*p3.y,
-    };
-    ctx.beginPath(); ctx.arc(pt.x, pt.y, 4, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.shadowColor = this._rgba(cf, 1); ctx.shadowBlur = 8;
-    ctx.fill(); ctx.shadowBlur = 0;
   }
 
   _drawCanvas() {
