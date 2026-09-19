@@ -143,6 +143,7 @@ const TEMPLATE = `
 
   #scene {
     position: relative;
+    isolation: isolate;  /* own stacking context: keeps node/status-bar z-index inside the card, so pop-ups can cover it */
     width: 100%;
     height: 100%;
     overflow: hidden;
