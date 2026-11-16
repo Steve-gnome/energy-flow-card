@@ -123,7 +123,7 @@ const COLORS = {
   home:      { r: 79,  g: 195, b: 247 },
   powerwall: { r: 102, g: 187, b: 106 },
   grid:      { r: 186, g: 104, b: 200 },
-  ev:        { r: 38,  g: 198, b: 218 },
+  ev:        { r: 255, g: 107, b: 107 },
 };
 
 const TEMPLATE = `
@@ -139,7 +139,7 @@ const TEMPLATE = `
     --home-color:      #4fc3f7;
     --powerwall-color: #66bb6a;
     --grid-color:      #ba68c8;
-    --ev-color:        #26c6da;
+    --ev-color:        #ff6b6b;
     --font-main:       'Rajdhani', sans-serif;
     --font-mono:       'Share Tech Mono', monospace;
   }
@@ -243,25 +243,25 @@ const TEMPLATE = `
   #node-home      .node-bubble { border-color: rgba(79,195,247,0.5);  box-shadow: 0 0 0px 0px rgba(79,195,247,0);   }
   #node-powerwall .node-bubble { border-color: rgba(102,187,106,0.5); box-shadow: 0 0 0px 0px rgba(102,187,106,0);  }
   #node-grid      .node-bubble { border-color: rgba(186,104,200,0.5); box-shadow: 0 0 0px 0px rgba(186,104,200,0);  }
-  #node-ev        .node-bubble { border-color: rgba(38,198,218,0.5);  box-shadow: 0 0 0px 0px rgba(38,198,218,0);   }
+  #node-ev        .node-bubble { border-color: rgba(255,107,107,0.5);  box-shadow: 0 0 0px 0px rgba(255,107,107,0);   }
 
   #node-solar.active     .node-bubble { border-color: rgba(245,200,66,0.9);  box-shadow: 0 0 20px 4px rgba(245,200,66,0.35);  }
   #node-home.active      .node-bubble { border-color: rgba(79,195,247,0.9);  box-shadow: 0 0 20px 4px rgba(79,195,247,0.35);  }
   #node-powerwall.active .node-bubble { border-color: rgba(102,187,106,0.9); box-shadow: 0 0 20px 4px rgba(102,187,106,0.35); }
   #node-grid.active      .node-bubble { border-color: rgba(186,104,200,0.9); box-shadow: 0 0 20px 4px rgba(186,104,200,0.35); }
-  #node-ev.active        .node-bubble { border-color: rgba(38,198,218,0.9);  box-shadow: 0 0 20px 4px rgba(38,198,218,0.35);  }
+  #node-ev.active        .node-bubble { border-color: rgba(255,107,107,0.9);  box-shadow: 0 0 20px 4px rgba(255,107,107,0.35);  }
 
   #node-solar     .node-icon  { color: #f5c842; }
   #node-home      .node-icon  { color: #4fc3f7; }
   #node-powerwall .node-icon  { color: #66bb6a; }
   #node-grid      .node-icon  { color: #ba68c8; }
-  #node-ev        .node-icon  { color: #26c6da; }
+  #node-ev        .node-icon  { color: #ff6b6b; }
 
   #node-solar     .node-value { color: #f5c842; }
   #node-home      .node-value { color: #4fc3f7; }
   #node-powerwall .node-value { color: #66bb6a; }
   #node-grid      .node-value { color: #ba68c8; }
-  #node-ev        .node-value { color: #26c6da; }
+  #node-ev        .node-value { color: #ff6b6b; }
 
   /* ── Battery gauge ── */
   .batt-gauge {
@@ -272,7 +272,7 @@ const TEMPLATE = `
     pointer-events: none;
   }
   #node-powerwall .batt-gauge { color: #66bb6a; right: -28px; left: auto; }
-  #node-ev        .batt-gauge { color: #26c6da; left: -28px;  right: auto; }
+  #node-ev        .batt-gauge { color: #ff6b6b; left: -28px;  right: auto; }
 
   .gauge-nub {
     position: absolute;
@@ -345,7 +345,7 @@ const TEMPLATE = `
   .flow-tag.solar  { color: #f5c842; border-color: rgba(245,200,66,0.5);  }
   .flow-tag.batt   { color: #66bb6a; border-color: rgba(102,187,106,0.5); }
   .flow-tag.grid   { color: #ba68c8; border-color: rgba(186,104,200,0.5); }
-  .flow-tag.ev     { color: #26c6da; border-color: rgba(38,198,218,0.5);  }
+  .flow-tag.ev     { color: #ff6b6b; border-color: rgba(255,107,107,0.5);  }
 
   .tag-kw {
     font-family: var(--font-mono);
@@ -418,7 +418,7 @@ const TEMPLATE = `
 
   <div class="node" id="node-ev">
     <div class="node-bubble">
-      <span class="pulse-ring" style="color:#26c6da"></span>
+      <span class="pulse-ring" style="color:#ff6b6b"></span>
       <div class="batt-gauge"><div class="gauge-nub"></div><div class="gauge-body"><div class="gauge-fill" id="gauge-ev-fill" style="height:0%"></div></div></div>
       <ha-icon class="node-icon" icon="mdi:car-electric"></ha-icon>
       <span class="node-label">EV</span>
@@ -874,11 +874,10 @@ class EnergyFlowCard extends HTMLElement {
     ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, p3.x, p3.y);
     ctx.lineCap = 'round';
 
-    // Soft glow: two wide, translucent solid strokes of the same path in the
-    // source colour, drawn under the dashes. Plain strokes, no shadowBlur.
+    // Soft glow: one wide, translucent solid stroke of the same path in the
+    // target (sink) colour, drawn under the dashes. Plain stroke, no shadowBlur.
     if (!this._config || this._config.flow_glow !== false) {
-      ctx.strokeStyle = this._rgba(cf, 0.18); ctx.lineWidth = 14; ctx.stroke();
-      ctx.strokeStyle = this._rgba(cf, 0.30); ctx.lineWidth = 7;  ctx.stroke();
+      ctx.strokeStyle = this._rgba(ct, 0.27); ctx.lineWidth = 21; ctx.stroke();
     }
 
     ctx.strokeStyle = grad; ctx.lineWidth = 3.5;
