@@ -55,6 +55,7 @@ weather_entity: weather.your_location
 # ── Node appearance ────────────────────────────────────────────
 node_opacity: 0.4       # 0.0 (transparent) to 1.0 (opaque), default 0.4
 node_animation: true    # Pulse ring animation, default true
+flow_glow: true         # Soft glow halo around flow lines, default true
 
 # ── Entity IDs ─────────────────────────────────────────────────
 # battery_power: negative = charging, positive = discharging

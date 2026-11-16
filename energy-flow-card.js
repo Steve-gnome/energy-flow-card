@@ -32,6 +32,9 @@
  * # Node pulse animation (true/false)
  * node_animation: true
  *
+ * # Soft glow halo around the flow lines (true/false)
+ * flow_glow: true
+ *
  * # Node labels (override default text on each node)
  * node_labels:
  *   solar:     Solar
@@ -539,6 +542,7 @@ class EnergyFlowCard extends HTMLElement {
       node_labels:    DEFAULT_LABELS,
       node_opacity:   0.4,
       node_animation: true,
+      flow_glow:      true,
     };
   }
 
@@ -868,6 +872,15 @@ class EnergyFlowCard extends HTMLElement {
     ctx.beginPath();
     ctx.moveTo(p0.x, p0.y);
     ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, p3.x, p3.y);
+    ctx.lineCap = 'round';
+
+    // Soft glow: two wide, translucent solid strokes of the same path in the
+    // source colour, drawn under the dashes. Plain strokes, no shadowBlur.
+    if (!this._config || this._config.flow_glow !== false) {
+      ctx.strokeStyle = this._rgba(cf, 0.18); ctx.lineWidth = 14; ctx.stroke();
+      ctx.strokeStyle = this._rgba(cf, 0.30); ctx.lineWidth = 7;  ctx.stroke();
+    }
+
     ctx.strokeStyle = grad; ctx.lineWidth = 3.5;
     ctx.setLineDash([14, 10]); ctx.lineDashOffset = offset;
     ctx.stroke(); ctx.setLineDash([]);
@@ -1041,6 +1054,10 @@ class EnergyFlowCardEditor extends HTMLElement {
         <span>Node pulse animation</span>
         <input id="node_animation" type="checkbox" ${c.node_animation !== false ? 'checked' : ''} />
       </div>
+      <div class="toggle-row">
+        <span>Flow line glow</span>
+        <input id="flow_glow" type="checkbox" ${c.flow_glow !== false ? 'checked' : ''} />
+      </div>
 
       <h4>Entity IDs</h4>
       <div class="grid">${entRows}</div>
@@ -1090,6 +1107,7 @@ class EnergyFlowCardEditor extends HTMLElement {
     opEl.addEventListener('change', fire);
 
     this.shadowRoot.getElementById('node_animation').addEventListener('change', fire);
+    this.shadowRoot.getElementById('flow_glow').addEventListener('change', fire);
 
     this.shadowRoot.querySelectorAll('[data-ent]').forEach(el => el.addEventListener('change', fire));
     this.shadowRoot.querySelectorAll('[data-lbl]').forEach(el => el.addEventListener('change', fire));
@@ -1119,6 +1137,7 @@ class EnergyFlowCardEditor extends HTMLElement {
 
     cfg.node_opacity   = parseFloat(sr.getElementById('node_opacity').value);
     cfg.node_animation = sr.getElementById('node_animation').checked;
+    cfg.flow_glow      = sr.getElementById('flow_glow').checked;
 
     const entities = {};
     sr.querySelectorAll('[data-ent]').forEach(el => {
